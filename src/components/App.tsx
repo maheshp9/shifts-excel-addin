@@ -110,7 +110,8 @@ export default class App extends React.Component<AppProps, AppState> {
         getGraphData(
 
                 // Get the `name` property of the first 3 Excel workbooks in the user's OneDrive.
-                "https://graph.microsoft.com/v1.0/me/drive/root/microsoft.graph.search(q = '.xlsx')?$select=name&top=3",
+                //"https://graph.microsoft.com/v1.0/me/drive/root/microsoft.graph.search(q = '.xlsx')?$select=name&top=3",
+                "https://graph.microsoft.com/v1.0/me/joinedTeams?$select=id,displayName,description",
                 this.accessToken
             )
             .then( async (response) => {

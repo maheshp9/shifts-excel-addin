@@ -12,9 +12,9 @@ export const writeFileNamesToWorksheet = async (result: AxiosResponse,
             const sheet = context.workbook.worksheets.getActiveWorksheet();
 
             const data = [
-                 [result.data.value[0].name],
-                 [result.data.value[1].name],
-                 [result.data.value[2].name]];
+                 [result.data.value[0].displayName],
+                 [result.data.value[1].displayName],
+                 [result.data.value[2].displayName]];
 
             const range = sheet.getRange('B5:B7');
             range.values = data;
@@ -58,13 +58,13 @@ export const signInO365 = async (setState: (x: AppState) => void,
     const processLoginMessage = (arg: {message: string, type: string}) => {
 
         let messageFromDialog = JSON.parse(arg.message);
-        if (messageFromDialog.status === 'success') { 
+        if (messageFromDialog.status === 'success') {
 
             // We now have a valid access token.
             loginDialog.close();
             setToken(messageFromDialog.result);
             setState( { authStatus: 'loggedIn',
-                        headerMessage: 'Get Data' });
+                        headerMessage: 'Select Team' });
         }
         else {
             // Something went wrong with authentication or the authorization of the web application.
