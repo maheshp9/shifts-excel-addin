@@ -109,31 +109,31 @@ module.exports = {
         ...WEBPACK_PLUGINS,
         new ExtractTextPlugin('[name].[hash].css'),
         new HtmlWebpackPlugin({
-            title: 'Office-Add-in-Microsoft-Graph-React',
+            title: 'Shifts-Addin',
             filename: 'index.html',
             template: './index.html',
             chunks: ['app', 'vendor', 'polyfills']
         }),
         new HtmlWebpackPlugin({
-            title: 'Office-Add-in-Microsoft-Graph-React',
+            title: 'Shifts-Addin',
             filename: 'function-file/function-file.html',
             template: '../function-file/function-file.html',
             chunks: ['function-file']
         }),
         new HtmlWebpackPlugin({
-            title: 'Office-Add-in-Microsoft-Graph-React',
+            title: 'Shifts-Addin',
             filename: 'login/login.html',
             template: '../login/login.html',
             chunks: ['login']
         }),
         new HtmlWebpackPlugin({
-            title: 'Office-Add-in-Microsoft-Graph-React',
+            title: 'Shifts-Addin',
             filename: 'logout/logout.html',
             template: '../logout/logout.html',
             chunks: ['logout']
         }),
         new HtmlWebpackPlugin({
-            title: 'Office-Add-in-Microsoft-Graph-React',
+            title: 'Shifts-Addin',
             filename: 'logoutcomplete/logoutcomplete.html',
             template: '../logoutcomplete/logoutcomplete.html',
             chunks: ['logoutcomplete']

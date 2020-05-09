@@ -53,15 +53,15 @@ export default class App extends React.Component<AppProps, AppState> {
     listItems: HeroListItem[] = [
         {
             icon: 'PlugConnected',
-            primaryText: 'Connects to OneDrive for Business.'
+            primaryText: 'Connects to your teams and schedules'
         },
         {
             icon: 'ExcelDocument',
-            primaryText: 'Gets the names of the first three workbooks in OneDrive for Business.'
+            primaryText: 'Gets the data from your schedules'
         },
         {
             icon: 'AddNotes',
-            primaryText: 'Adds the names to the current document.'
+            primaryText: 'Lets you manage teams and schedules'
         }
     ];
 
@@ -133,7 +133,7 @@ export default class App extends React.Component<AppProps, AppState> {
             return (
                 <Progress
                     title={title}
-                    logo='assets/Onedrive_Charts_icon_80x80px.png'
+                    logo='assets/Shifts_icon.png'
                     message='Please sideload your add-in to see app body.'
                 />
             );
@@ -167,7 +167,7 @@ export default class App extends React.Component<AppProps, AppState> {
                 : null }
 
                 <div className='ms-welcome'>
-                    <Header logo='assets/Onedrive_Charts_icon_80x80px.png' title={this.props.title} message={this.state.headerMessage} />
+                    <Header logo='assets/Shifts_icon.png' title={this.props.title} message={this.state.headerMessage} />
                     {body}
                 </div>
             </div>

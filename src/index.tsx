@@ -12,7 +12,7 @@ initializeIcons();
 
 let isOfficeInitialized = false;
 
-const title = 'Office-Add-in-Microsoft-Graph-React';
+const title = 'Shifts-Addin';
 
 const render = (Component) => {
     ReactDOM.render(
