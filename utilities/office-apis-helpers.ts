@@ -27,6 +27,69 @@ export const writeFileNamesToWorksheet = async (result: AxiosResponse,
         });
 };
 
+export const writeGroupMembersToWorksheet = async (result: AxiosResponse,
+                                                displayError: (x: string) => void) => {
+        return Excel.run( (context: Excel.RequestContext) => {
+            context.workbook.worksheets.getItemOrNullObject('Team Membership').delete();
+            const sheet = context.workbook.worksheets.add('Team Membership');
+
+            let expensesTable = sheet.tables.add('A1:D1', true);
+            expensesTable.name = 'TeamMembers';
+            expensesTable.getHeaderRowRange().values = [['User Email', 'DisplayName', 'FirstName', 'LastName']];
+            const members = result && result.data && result.data.value || [];
+            const memberData = members.map((item) => [item.userPrincipalName, item.displayname, item.givenName, item.surname]);
+
+            expensesTable.rows.add(null, memberData);
+
+            sheet.getUsedRange().format.autofitColumns();
+            sheet.getUsedRange().format.autofitRows();
+
+            sheet.activate();
+            return context.sync();
+        }).catch( (error) => {
+            displayError(error.toString());
+        });
+};
+
+export const writeScheduleGroupInformation = async (teamDataResponse: AxiosResponse, scheduleGroupDataResponse: AxiosResponse, displayError: (x: string) => void) => {
+    return Excel.run( (context: Excel.RequestContext) => {
+        context.workbook.worksheets.getItemOrNullObject('Schedule Membership').delete();
+        const sheet = context.workbook.worksheets.add('Schedule Membership');
+        let scheduleGroupTable = sheet.tables.add('A1:E1', true);
+        scheduleGroupTable.name = 'ScheduleGroups';
+        scheduleGroupTable.getHeaderRowRange().values = [['Schedule Group Name', 'User Email', 'Display Name', 'First Name', 'Last Name']];
+        const members = teamDataResponse && teamDataResponse.data && teamDataResponse.data.value || [];
+
+        // create a member map
+        let membersMap = {};
+        members.forEach((member) => {
+            membersMap[member.id] = member;
+        });
+        const scheduleGroups = scheduleGroupDataResponse && scheduleGroupDataResponse.data && scheduleGroupDataResponse.data.value || [];
+        const scheduleGroupData = [];
+        scheduleGroups.forEach((scheduleGroup) => {
+            console.log(JSON.stringify(scheduleGroup));
+            const membersInGroup = scheduleGroup.userIds || [];
+            membersInGroup.forEach((userId) => {
+                const user = membersMap[userId];
+                console.log(JSON.stringify(user));
+                scheduleGroupData.push([scheduleGroup.displayName, user.userPrincipalName, user.displayName, user.givenName, user.surname]);
+            });
+        });
+        // const memberData = members.map((item) => [item.id, item.userPrincipalName, item.displayname, item.givenName, item.surname, item.mail]);
+
+        scheduleGroupTable.rows.add(null, scheduleGroupData);
+
+        sheet.getUsedRange().format.autofitColumns();
+        sheet.getUsedRange().format.autofitRows();
+
+        sheet.activate();
+        return context.sync();
+    }).catch( (error) => {
+        displayError(error.toString());
+    });
+};
+
 /*
     Managing the dialogs.
 */

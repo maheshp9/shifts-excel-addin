@@ -4,11 +4,11 @@ import Header from './Header';
 import { HeroListItem } from './HeroList';
 import Progress from './Progress';
 import StartPageBody from './StartPageBody';
-import GetDataPageBody from './GetDataPageBody';
+// import GetDataPageBody from './GetDataPageBody';
 import SuccessPageBody from './SuccessPageBody';
 import OfficeAddinMessageBar from './OfficeAddinMessageBar';
 import { getGraphData } from '../../utilities/microsoft-graph-helpers';
-import { writeFileNamesToWorksheet, logoutFromO365, signInO365 } from '../../utilities/office-apis-helpers';
+import { writeFileNamesToWorksheet, logoutFromO365, signInO365, writeGroupMembersToWorksheet, writeScheduleGroupInformation } from '../../utilities/office-apis-helpers';
 
 
 export interface AppProps {
@@ -105,7 +105,7 @@ export default class App extends React.Component<AppProps, AppState> {
         await logoutFromO365(this.boundSetState, this.displayError);
     }
 
-    getFileNames = async () => {
+    getFileNames = async (_teamId: string) => {
         this.setState({ fileFetch: 'fetchInProcess' });
         getGraphData(
 
@@ -125,6 +125,31 @@ export default class App extends React.Component<AppProps, AppState> {
                 // writeFileNamesToWorksheet
                 this.displayError(requestError);
             });
+    }
+
+    addScheduleInfo = async (teamId: string) => {
+        // get team members list
+        // add them to Team worksheet
+
+        try {
+            let teamDataResponse = await getGraphData('https://graph.microsoft.com/v1.0/groups/' + teamId + '/members?$select=id,displayName,mail,userPrincipalName,givenName,surname', this.accessToken);
+            await writeGroupMembersToWorksheet(teamDataResponse, this.displayError);
+            let scheduleGroupsResponse = await getGraphData('https://graph.microsoft.com/v1.0/teams/' + teamId + '/schedule/schedulingGroups', this.accessToken);
+            await writeScheduleGroupInformation(teamDataResponse, scheduleGroupsResponse, this.displayError);
+        } catch (error) {
+            this.displayError(error);
+        }
+
+        // get schedule members list
+        // add them to schedule worksheet
+    }
+
+    getTeamsList = async () => {
+        let graphResponse = await getGraphData(
+            "https://graph.microsoft.com/v1.0/me/joinedTeams?$select=id,displayName,description",
+            this.accessToken
+        );
+        return graphResponse && graphResponse.data && graphResponse.data.value ? graphResponse.data.value : [];
     }
 
     render() {
@@ -151,13 +176,14 @@ export default class App extends React.Component<AppProps, AppState> {
         }
         else {
             if (this.state.fileFetch === 'notFetched') {
-                body = ( <GetDataPageBody getFileNames={this.getFileNames} logout={this.logout}/> );
+               // body = ( <GetDataPageBody getFileNames={this.getFileNames} logout={this.logout}/> );
+               body = ( <SuccessPageBody getFileNames={this.getFileNames} logout={this.logout} getTeamsList={this.getTeamsList} addScheduleInfo={this.addScheduleInfo} /> );
             }
             else if (this.state.fileFetch === 'fetchInProcess') {
                 body = ( <Spinner className='spinner' type={SpinnerType.large} label='We are getting the data for you.' /> );
             }
             else {
-                body = ( <SuccessPageBody getFileNames={this.getFileNames} logout={this.logout} /> );
+                body = ( <SuccessPageBody getFileNames={this.getFileNames} logout={this.logout} getTeamsList={this.getTeamsList}  addScheduleInfo={this.addScheduleInfo}/> );
             }
         }
 
