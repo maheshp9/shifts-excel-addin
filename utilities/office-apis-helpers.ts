@@ -27,47 +27,88 @@ export const writeFileNamesToWorksheet = async (result: AxiosResponse,
         });
 };
 
-export const writeGroupMembersToWorksheet = async (result: AxiosResponse,
-                                                displayError: (x: string) => void) => {
-        return Excel.run( (context: Excel.RequestContext) => {
-            context.workbook.worksheets.getItemOrNullObject('Team Membership').delete();
-            const sheet = context.workbook.worksheets.add('Team Membership');
-
-            let expensesTable = sheet.tables.add('A1:D1', true);
-            expensesTable.name = 'TeamMembers';
-            expensesTable.getHeaderRowRange().values = [['User Email', 'DisplayName', 'FirstName', 'LastName']];
-            const members = result && result.data && result.data.value || [];
-            const memberData = members.map((item) => [item.userPrincipalName, item.displayname, item.givenName, item.surname]);
-
-            expensesTable.rows.add(null, memberData);
-
-            sheet.getUsedRange().format.autofitColumns();
-            sheet.getUsedRange().format.autofitRows();
-
-            sheet.activate();
-            return context.sync();
-        }).catch( (error) => {
-            displayError(error.toString());
-        });
+const getMembersMap = (teamOwners: Array<any>, teamMembers: Array<any>) => {
+    let membersMap = {};
+    teamMembers.forEach((member) => {
+        membersMap[member.id] = { ...member, isOwner: false};
+    });
+    teamOwners.forEach((owner) => {
+        membersMap[owner.id] = { ...owner, isOwner: true };
+    });
+    return membersMap;
 };
 
-export const writeScheduleGroupInformation = async (teamDataResponse: AxiosResponse, scheduleGroupDataResponse: AxiosResponse, displayError: (x: string) => void) => {
+const getMembersMapByUPN = (membersMap: any) => {
+    let membersMapByUPN = {};
+    Object.keys(membersMap).forEach((memberId) => {
+        const member = membersMap[memberId];
+        membersMapByUPN[member.userPrincipalName] = member;
+    });
+    return membersMapByUPN;
+};
+
+const getScheduleGroupNamesMap = (scheduleGroups: Array<any>) => {
+    let scheduleGroupNamesMap = {};
+    scheduleGroups.forEach((scheduleGroup) => {
+        if (scheduleGroup.isActive) {
+            scheduleGroupNamesMap[scheduleGroup.displayName] = scheduleGroup;
+        }
+    });
+    return scheduleGroupNamesMap;
+};
+
+const isUserInSchedule = (userId: string, scheduleGroupNamesMap: any) => {
+    let userInSchedule: boolean = false;
+    Object.keys(scheduleGroupNamesMap).forEach((scheduleGroupName) => {
+        const scheduleGroup = scheduleGroupNamesMap[scheduleGroupName];
+        if (scheduleGroup.userIds.indexOf(userId) >= 0) {
+            userInSchedule = true;
+        }
+    });
+    return userInSchedule;
+};
+
+const writeGroupMembersToWorksheet = async (membersMap: any,
+                                                    scheduleGroupNamesMap: any,
+                                                    displayError: (x: string) => void) => {
+    return Excel.run( (context: Excel.RequestContext) => {
+        context.workbook.worksheets.getItemOrNullObject('Team Membership').delete();
+        const sheet = context.workbook.worksheets.add('Team Membership');
+
+        let teamMembersTable = sheet.tables.add('A1:F1', true);
+        teamMembersTable.name = 'TeamMembers';
+        teamMembersTable.getHeaderRowRange().values = [['User Email', 'DisplayName', 'FirstName', 'LastName', 'isOwner', 'inSchedule']];
+
+        let membersData = [];
+        Object.keys(membersMap).forEach((memberId) => {
+            const user = membersMap[memberId];
+            const userInSchedule = isUserInSchedule(user.id, scheduleGroupNamesMap);
+            membersData.push([user.userPrincipalName, user.displayName, user.givenName, user.surname, user.isOwner, userInSchedule]);
+        });
+
+        teamMembersTable.rows.add(null, membersData);
+
+        sheet.getUsedRange().format.autofitColumns();
+        sheet.getUsedRange().format.autofitRows();
+
+        sheet.activate();
+        return context.sync();
+    }).catch( (error) => {
+        displayError(error.toString());
+    });
+};
+
+const writeScheduleGroupInformation = async (membersMap: any, scheduleGroupNamesMap: any, displayError: (x: string) => void) => {
     return Excel.run( (context: Excel.RequestContext) => {
         context.workbook.worksheets.getItemOrNullObject('Schedule Membership').delete();
         const sheet = context.workbook.worksheets.add('Schedule Membership');
         let scheduleGroupTable = sheet.tables.add('A1:E1', true);
         scheduleGroupTable.name = 'ScheduleGroups';
         scheduleGroupTable.getHeaderRowRange().values = [['Schedule Group Name', 'User Email', 'Display Name', 'First Name', 'Last Name']];
-        const members = teamDataResponse && teamDataResponse.data && teamDataResponse.data.value || [];
-
-        // create a member map
-        let membersMap = {};
-        members.forEach((member) => {
-            membersMap[member.id] = member;
-        });
-        const scheduleGroups = scheduleGroupDataResponse && scheduleGroupDataResponse.data && scheduleGroupDataResponse.data.value || [];
+        // const scheduleGroups = scheduleGroupDataResponse && scheduleGroupDataResponse.data && scheduleGroupDataResponse.data.value || [];
         const scheduleGroupData = [];
-        scheduleGroups.forEach((scheduleGroup) => {
+        Object.keys(scheduleGroupNamesMap).forEach((scheduleGroupName) => {
+            const scheduleGroup = scheduleGroupNamesMap[scheduleGroupName];
             console.log(JSON.stringify(scheduleGroup));
             const membersInGroup = scheduleGroup.userIds || [];
             membersInGroup.forEach((userId) => {
@@ -76,7 +117,6 @@ export const writeScheduleGroupInformation = async (teamDataResponse: AxiosRespo
                 scheduleGroupData.push([scheduleGroup.displayName, user.userPrincipalName, user.displayName, user.givenName, user.surname]);
             });
         });
-        // const memberData = members.map((item) => [item.id, item.userPrincipalName, item.displayname, item.givenName, item.surname, item.mail]);
 
         scheduleGroupTable.rows.add(null, scheduleGroupData);
 
@@ -88,6 +128,85 @@ export const writeScheduleGroupInformation = async (teamDataResponse: AxiosRespo
     }).catch( (error) => {
         displayError(error.toString());
     });
+};
+
+
+const syncDatatoGraph = async (membersMap: any, scheduleGroupNamesMap: any, displayError: (x: string) => void, pushUpdatedScheduleGroupsToGraph: (scheduleGroupsToSync: any[], selectedTeamId: string) => Promise<any>[], selectedTeamId: string, setState: (x: AppState) => void) => {
+    setState({headerMessage: 'Sync data in progress', fileFetch: 'fetchInProcess'});
+    return Excel.run( (context: Excel.RequestContext) => {
+        // get existing table
+        let sheet = context.workbook.worksheets.getItem('Schedule Membership');
+        let scheduleGroupsTable = sheet.tables.getItem('ScheduleGroups');
+        const scheduleGroupsTableBodyRange = scheduleGroupsTable.getDataBodyRange().load('values');
+        const membersMapByUPN = getMembersMapByUPN(membersMap);
+        return context.sync().then(async () => {
+            for (let i = 0; i < scheduleGroupsTableBodyRange.values.length; i ++) {
+                // for each row, check if the row is part of exising schedule
+                const scheduleMemberRow = scheduleGroupsTableBodyRange.values[i];
+                // TODO: Validate schedule Row
+                const scheduleGroupName = scheduleMemberRow[0];
+                const userUPN = scheduleMemberRow[1];
+                const user = membersMapByUPN[userUPN];
+                const scheduleGroup = scheduleGroupNamesMap[scheduleGroupName];
+
+                if (!scheduleGroup) {
+                    // no scheduleGroup. Create one
+                    let newScheduleGroup = {
+                        displayName: scheduleGroupName || "new group",
+                        userIds: [user.id],
+                        isNew: true,
+                        shouldSync: true
+                    };
+                    scheduleGroupNamesMap[newScheduleGroup.displayName] = newScheduleGroup;
+                } else if (scheduleGroup.userIds.indexOf(user.id) < 0) {
+                    // check if user is already part of schedule. if not, add the user
+                    scheduleGroup.userIds.push(user.id);
+                    scheduleGroup.shouldSync = true;
+                }
+            }
+            // filter all schedule groups that need to be synced and update them
+            let scheduleGroupsToSync = [];
+            Object.keys(scheduleGroupNamesMap).forEach((scheduleGroupName) => {
+                const scheduleGroup = scheduleGroupNamesMap[scheduleGroupName];
+                if (scheduleGroup.shouldSync) {
+                    scheduleGroupsToSync.push(scheduleGroup);
+                }
+            });
+            const updateGroupsPromises = pushUpdatedScheduleGroupsToGraph(scheduleGroupsToSync, selectedTeamId);
+            Promise.all(updateGroupsPromises).then(() => {
+                setState({headerMessage: 'Sync Complete', fileFetch: 'fetchCompleted'});
+                return context.sync();
+            });
+        });
+    }).catch( (error) => {
+        displayError(error.toString());
+    });
+};
+
+export const syncScheduleGroupInfo = async (teamMembersResult : AxiosResponse,
+                                            teamOwnersResult: AxiosResponse,
+                                            scheduleGroupsResult: AxiosResponse,
+                                            displayError: (x: string) => void,
+                                            isSync: boolean = false,
+                                            pushUpdatedScheduleGroupsToGraph: (scheduleGroupsToSync: any[], selectedTeamId: string) => Promise<any>[],
+                                            selectedTeamId: string,
+                                            setState: (x: AppState) => void) => {
+
+        const existingTeamMembersArray = teamMembersResult && teamMembersResult.data && teamMembersResult.data.value || [];
+        const existingTeamOwnersArray = teamOwnersResult && teamOwnersResult.data && teamOwnersResult.data.value || [];
+        const existingScheduleGroupsArray = scheduleGroupsResult && scheduleGroupsResult.data && scheduleGroupsResult.data.value || [];
+
+        const existingMemberMap = getMembersMap(existingTeamOwnersArray, existingTeamMembersArray);
+        const existingScheduleGroupNamesMap = getScheduleGroupNamesMap(existingScheduleGroupsArray);
+
+        if (!isSync) {
+            // Just get the data and write it to the sheets
+            await writeGroupMembersToWorksheet(existingMemberMap, existingScheduleGroupNamesMap, displayError);
+            await writeScheduleGroupInformation(existingMemberMap, existingScheduleGroupNamesMap, displayError);
+        } else {
+            // read the data from the sheets and compare with existing data and write back the delta
+            await syncDatatoGraph(existingMemberMap, existingScheduleGroupNamesMap, displayError, pushUpdatedScheduleGroupsToGraph, selectedTeamId, setState);
+        }
 };
 
 /*
@@ -196,4 +315,3 @@ const processDialogEvent = (arg: {error: number, type: string},
             break;
     }
 };
-

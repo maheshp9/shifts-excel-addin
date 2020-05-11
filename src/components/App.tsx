@@ -7,8 +7,8 @@ import StartPageBody from './StartPageBody';
 // import GetDataPageBody from './GetDataPageBody';
 import SuccessPageBody from './SuccessPageBody';
 import OfficeAddinMessageBar from './OfficeAddinMessageBar';
-import { getGraphData } from '../../utilities/microsoft-graph-helpers';
-import { writeFileNamesToWorksheet, logoutFromO365, signInO365, writeGroupMembersToWorksheet, writeScheduleGroupInformation } from '../../utilities/office-apis-helpers';
+import { getGraphData, updateGraphData, postGraphData } from '../../utilities/microsoft-graph-helpers';
+import { writeFileNamesToWorksheet, logoutFromO365, signInO365, syncScheduleGroupInfo } from '../../utilities/office-apis-helpers';
 
 
 export interface AppProps {
@@ -127,21 +127,34 @@ export default class App extends React.Component<AppProps, AppState> {
             });
     }
 
-    addScheduleInfo = async (teamId: string) => {
-        // get team members list
-        // add them to Team worksheet
+    pushUpdatedScheduleGroupsToGraph = (scheduleGroupsToSync: any[], selectedTeamId: string) => {
+        const updatePromises = scheduleGroupsToSync.map(scheduleGroup => {
+            if (scheduleGroup.isNew) {
+                const graphUrl =  'https://graph.microsoft.com/v1.0/teams/' + selectedTeamId + '/schedule/schedulingGroups';
+                return postGraphData(graphUrl, {...scheduleGroup}, this.accessToken);
+            } else {
+                const graphUrl = 'https://graph.microsoft.com/v1.0/teams/' + selectedTeamId + '/schedule/schedulingGroups/' + scheduleGroup.id;
+                return updateGraphData(graphUrl, { ...scheduleGroup, isActive: true }, this.accessToken);
+            }
+        });
+        return updatePromises;
+    }
 
+    syncScheduleInfo = async (teamId: string, isSync: boolean = false) => {
         try {
-            let teamDataResponse = await getGraphData('https://graph.microsoft.com/v1.0/groups/' + teamId + '/members?$select=id,displayName,mail,userPrincipalName,givenName,surname', this.accessToken);
-            await writeGroupMembersToWorksheet(teamDataResponse, this.displayError);
-            let scheduleGroupsResponse = await getGraphData('https://graph.microsoft.com/v1.0/teams/' + teamId + '/schedule/schedulingGroups', this.accessToken);
-            await writeScheduleGroupInformation(teamDataResponse, scheduleGroupsResponse, this.displayError);
+            // get team members list, team owners list, schedule groups information
+            let graphAPICalls = [];
+            graphAPICalls.push(getGraphData('https://graph.microsoft.com/v1.0/groups/' + teamId + '/members?$select=id,displayName,mail,userPrincipalName,givenName,surname', this.accessToken));
+            graphAPICalls.push(getGraphData('https://graph.microsoft.com/v1.0/groups/' + teamId + '/owners?$select=id,displayName,mail,userPrincipalName,givenName,surname', this.accessToken));
+            graphAPICalls.push(getGraphData('https://graph.microsoft.com/v1.0/teams/' + teamId + '/schedule/schedulingGroups', this.accessToken));
+            Promise.all(graphAPICalls).then(async (responses) => {
+                // await writeGroupMembersToWorksheet(responses[0], responses[1], this.displayError);
+                // await writeScheduleGroupInformation(responses[0], responses[2], this.displayError);
+                await syncScheduleGroupInfo(responses[0], responses[1], responses[2], this.displayError, isSync, this.pushUpdatedScheduleGroupsToGraph, teamId, this.boundSetState);
+            });
         } catch (error) {
             this.displayError(error);
         }
-
-        // get schedule members list
-        // add them to schedule worksheet
     }
 
     getTeamsList = async () => {
@@ -177,13 +190,27 @@ export default class App extends React.Component<AppProps, AppState> {
         else {
             if (this.state.fileFetch === 'notFetched') {
                // body = ( <GetDataPageBody getFileNames={this.getFileNames} logout={this.logout}/> );
-               body = ( <SuccessPageBody getFileNames={this.getFileNames} logout={this.logout} getTeamsList={this.getTeamsList} addScheduleInfo={this.addScheduleInfo} /> );
+               body = (
+                    <SuccessPageBody
+                        getFileNames={this.getFileNames}
+                        logout={this.logout}
+                        getTeamsList={this.getTeamsList}
+                        syncScheduleInfo={this.syncScheduleInfo}
+                    />
+                );
             }
             else if (this.state.fileFetch === 'fetchInProcess') {
-                body = ( <Spinner className='spinner' type={SpinnerType.large} label='We are getting the data for you.' /> );
+                body = ( <Spinner className='spinner' type={SpinnerType.large} label='We are syncing the data for you.' /> );
             }
             else {
-                body = ( <SuccessPageBody getFileNames={this.getFileNames} logout={this.logout} getTeamsList={this.getTeamsList}  addScheduleInfo={this.addScheduleInfo}/> );
+                body = (
+                    <SuccessPageBody
+                        getFileNames={this.getFileNames}
+                        logout={this.logout}
+                        getTeamsList={this.getTeamsList}
+                        syncScheduleInfo={this.syncScheduleInfo}
+                    />
+                );
             }
         }
 

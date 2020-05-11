@@ -7,7 +7,7 @@ export interface SuccessPageBodyProps {
     getFileNames: (teamId: string) => {};
     logout: () => {};
     getTeamsList: () => Promise<any>;
-    addScheduleInfo?: (teamId: string) => {};
+    syncScheduleInfo?: (teamId: string, isSync?: boolean) => {};
 }
 
 export interface SuccessPagebodyAppSate {
@@ -50,7 +50,11 @@ export default class SuccessPageBody extends React.Component<SuccessPageBodyProp
     }
 
     getScheduleButtonHandler = () => {
-        this.props.addScheduleInfo(this.state.selectedTeamId);
+        this.props.syncScheduleInfo(this.state.selectedTeamId, false /* isSync */);
+    }
+
+    syncScheduleButtonHandler = () => {
+        this.props.syncScheduleInfo(this.state.selectedTeamId, true /* isSync */);
     }
 
     renderBody = () => {
@@ -59,8 +63,9 @@ export default class SuccessPageBody extends React.Component<SuccessPageBodyProp
             return (
                 <>
                     <Dropdown placeHolder='Select a team' options={ this.getDropDownOptions(this.teamsList || []) }  onChange={this.onTeamSelected } />
-                    <h2 className='ms-font-xl ms-fontWeight-semilight ms-fontColor-neutralPrimary ms-u-slideUpIn20'>Selected Team: { this.state.selectedTeamId || '' } </h2>
-                    <Button className='ms-welcome__action' buttonType={ButtonType.hero} iconProps={{ iconName: 'ChevronRight' }} onClick={this.getScheduleButtonHandler}>Get Schedules</Button>
+                    {/* <h2 className='ms-font-xl ms-fontWeight-semilight ms-fontColor-neutralPrimary ms-u-slideUpIn20'>Selected Team: { this.state.selectedTeamId || '' } </h2> */}
+                    <Button className='ms-welcome__action' buttonType={ButtonType.hero} iconProps={{ iconName: 'ChevronRight' }} onClick={this.getScheduleButtonHandler}>Get Schedule Membership</Button>
+                    <Button className='ms-welcome__action' buttonType={ButtonType.hero} iconProps={{ iconName: 'Sync' }} onClick={this.syncScheduleButtonHandler}>Sync Schedule membership data</Button>
                     <Button className='ms-welcome__action' buttonType={ButtonType.hero} iconProps={{ iconName: 'ChevronRight' }} onClick={logout}>Sign out from Office 365</Button>
                 </>
             );
